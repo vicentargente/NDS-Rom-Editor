@@ -4,47 +4,52 @@ namespace NDSRom.Tools
 {
     public class FileCopier
     {
+        //Default buffer size (128kB)
+        private const uint DEFAULT_BUFFER_SIZE = 0x20000;
+
         //Singleton
         private static FileCopier Instance;
-        public static FileCopier GetInstance(uint BufferSize = 0x20000)
-        {
-            if (Instance == null) Instance = new FileCopier(BufferSize);
+        public static FileCopier Create(uint bufferSize = DEFAULT_BUFFER_SIZE) {
+            if (Instance == null) Instance = new FileCopier(bufferSize);
             return Instance;
         }
-        //
-
-        private byte[] Buffer;
-
-        private FileCopier(uint BufferSize)
+        public static FileCopier GetInstance()
         {
-            this.Buffer = new byte[BufferSize];
+            return Instance;
         }
 
-        public void Copy(Stream Input, Stream Output)
+        private byte[] buffer;
+
+        private FileCopier(uint bufferSize)
         {
-            Copy(Input, 0, (uint)Input.Length, Output, 0);
+            this.buffer = new byte[bufferSize];
         }
 
-        public void Copy(Stream Input, uint InputBegining, uint InputSize, Stream Output, uint OutputBegining = 0)
+        public void Copy(Stream input, Stream output)
         {
-            long inputPosAux = Input.Position;
-            long outputPosAux = Output.Position;
+            Copy(input, 0, (uint)input.Length, output, 0);
+        }
 
-            Input.Position = InputBegining;
-            Output.Position = OutputBegining;
+        public void Copy(Stream input, uint inputBegining, uint inputSize, Stream output, uint outputBegining = 0)
+        {
+            long inputPosAux = input.Position;
+            long outputPosAux = output.Position;
 
-            ushort nIters = (ushort)(InputSize / this.Buffer.Length);
-            int excess = (int)(InputSize % this.Buffer.Length);
+            input.Position = inputBegining;
+            output.Position = outputBegining;
+
+            ushort nIters = (ushort)(inputSize / this.buffer.Length);
+            int excess = (int)(inputSize % this.buffer.Length);
             for (ushort i = 0; i < nIters; i++)
             {
-                Input.Read(this.Buffer, 0, this.Buffer.Length);
-                Output.Write(this.Buffer, 0, this.Buffer.Length);
+                input.Read(this.buffer, 0, this.buffer.Length);
+                output.Write(this.buffer, 0, this.buffer.Length);
             }
-            Input.Read(this.Buffer, 0, excess);
-            Output.Write(this.Buffer, 0, excess);
+            input.Read(this.buffer, 0, excess);
+            output.Write(this.buffer, 0, excess);
 
-            Input.Position = inputPosAux;
-            Output.Position = outputPosAux;
+            input.Position = inputPosAux;
+            output.Position = outputPosAux;
         }
     }
 }

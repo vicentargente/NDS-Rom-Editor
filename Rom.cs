@@ -10,62 +10,59 @@ namespace NDSRom
 {
     public class Rom
     {
-        //private const uint MAXIMUM_SMALL_COPY_BUFFER_SIZE = 0x40000; //256kB
-        //private const uint MAXIMUM_BIG_COPY_BUFFER_SIZE = 0x800000; //8MB
+        private string romPath;
 
-        private string RomPath;
-
-        private Header Header;
-        private FileNameTable Fnt;
-        private FileAllocationTable Fat;
+        private Header header;
+        private FileNameTable fnt;
+        private FileAllocationTable fat;
 
         //Variables para exportar la rom
-        private FileAllocationTable ModifiedRomFat;
-        private Dictionary<ushort, ImportedFile> ImportedFiles; //Key -> FileId; Value -> FileComputerPath
-        private FileCopier FileCopier;
+        private FileAllocationTable modifiedRomFat;
+        private Dictionary<ushort, ImportedFile> importedFiles; //Key -> FileId; Value -> FileComputerPath
+        private FileCopier fileCopier;
         //---//
 
         public byte[] GameCode
         {
             get
             {
-                return this.Header.GameCode;
+                return this.header.GameCode;
             }
         }
-        public Rom(string ComputerPath)
+        public Rom(string path)
         {
-            this.RomPath = ComputerPath;
-            BinaryReader rom = new BinaryReader(File.OpenRead(ComputerPath));
+            this.romPath = path;
+            BinaryReader rom = new BinaryReader(File.OpenRead(path));
 
-            this.Header = new Header(rom);
-            this.Fnt = new FileNameTable(rom);
-            this.Fat = new FileAllocationTable(rom);
+            this.header = new Header(rom);
+            this.fnt = new FileNameTable(rom);
+            this.fat = new FileAllocationTable(rom);
 
             rom.Close();
 
-            this.ModifiedRomFat = this.Fat.Clone();
-            this.ImportedFiles = new Dictionary<ushort, ImportedFile>();
-            this.FileCopier = FileCopier.GetInstance();
+            this.modifiedRomFat = this.fat.Clone();
+            this.importedFiles = new Dictionary<ushort, ImportedFile>();
+            this.fileCopier = FileCopier.Create();
         }
 
-        public void GetFile(string RomInternalFilePath, string ComputerPath)
+        public void GetFile(string romInternalFilePath, string computerPath)
         {
-            ushort fileId = this.Fnt.GetFileId(RomInternalFilePath);
-            FileStream rom = new FileStream(this.RomPath, FileMode.Open, FileAccess.Read);
-            FileStream exportedFile = new FileStream(ComputerPath, FileMode.Create, FileAccess.Write);
-            this.FileCopier.Copy(rom, this.Fat.GetStartOffsetFromFileId(fileId), this.Fat.GetSizeFromFileId(fileId), exportedFile);
+            ushort fileId = this.fnt.GetFileId(romInternalFilePath);
+            FileStream rom = new FileStream(this.romPath, FileMode.Open, FileAccess.Read);
+            FileStream exportedFile = new FileStream(computerPath, FileMode.Create, FileAccess.Write);
+            this.fileCopier.Copy(rom, this.fat.GetStartOffsetFromFileId(fileId), this.fat.GetSizeFromFileId(fileId), exportedFile);
 
             exportedFile.Close();
             rom.Close();
         }
 
-        public byte[] GetFile(string RomInternalFilePath)
+        public byte[] GetFile(string romInternalFilePath)
         {
-            ushort fileId = this.Fnt.GetFileId(RomInternalFilePath);
-            BinaryReader rom = new BinaryReader(File.OpenRead(this.RomPath));
+            ushort fileId = this.fnt.GetFileId(romInternalFilePath);
+            BinaryReader rom = new BinaryReader(File.OpenRead(this.romPath));
 
-            rom.BaseStream.Position = this.Fat.GetStartOffsetFromFileId(fileId);
-            uint fileLength = this.Fat.GetSizeFromFileId(fileId);
+            rom.BaseStream.Position = this.fat.GetStartOffsetFromFileId(fileId);
+            uint fileLength = this.fat.GetSizeFromFileId(fileId);
 
             byte[] res = new byte[fileLength];
             rom.Read(res, 0, res.Length);
@@ -75,100 +72,104 @@ namespace NDSRom
             return res;
         }
 
-        public void ImportFile(string RomInternalFilePath, string FileNewPath)
+        public void ImportFile(string romInternalFilePath, string fileNewPath)
         {
-            this.ImportFile(this.Fnt.GetFileId(RomInternalFilePath), FileNewPath);
+            this.ImportFile(this.fnt.GetFileId(romInternalFilePath), fileNewPath);
         }
-        public void ImportFile(ushort FileId, string FileNewPath)
+        public void ImportFile(ushort fileId, string fileNewPath)
         {
-            this.ImportedFiles[FileId] = new ExternalImportedFile(FileNewPath, this.FileCopier);
+            this.importedFiles[fileId] = new ExternalImportedFile(fileNewPath, this.fileCopier);
         }
-        public void ImportFile(string RomInternalFilePath, byte[] NewFile)
+        public void ImportFile(string romInternalFilePath, byte[] newFile)
         {
-            this.ImportFile(this.Fnt.GetFileId(RomInternalFilePath), NewFile);
+            this.ImportFile(this.fnt.GetFileId(romInternalFilePath), newFile);
         }
-        public void ImportFile(ushort FileId, byte[] NewFile)
+        public void ImportFile(ushort fileId, byte[] newFile)
         {
-            this.ImportedFiles[FileId] = new ByteArrayImportedFile(NewFile);
+            this.importedFiles[fileId] = new ByteArrayImportedFile(newFile);
         }
 
         //Indica si el usuario ha reemplazado ese archivo, de manera que podrá revertir o no el reemplazo
-        public bool FileHasBeenReplaced(string RomInternalFilePath)
+        public bool FileHasBeenReplaced(string romInternalFilePath)
         {
-            return this.FileHasBeenReplaced(this.Fnt.GetFileId(RomInternalFilePath));
+            return this.FileHasBeenReplaced(this.fnt.GetFileId(romInternalFilePath));
         }
 
-        public bool FileHasBeenReplaced(ushort FileId)
+        public bool FileHasBeenReplaced(ushort fileId)
         {
-            return this.ImportedFiles.ContainsKey(FileId);
+            return this.importedFiles.ContainsKey(fileId);
         }
 
         //Revierte la importación de un archivo, haciendo que quede el original de la rom
-        public void RevertImportFile(string RomInternalFilePath)
+        public void RevertImportFile(string romInternalFilePath)
         {
-            this.RevertImportFile(this.Fnt.GetFileId(RomInternalFilePath));
+            this.RevertImportFile(this.fnt.GetFileId(romInternalFilePath));
         }
 
-        public void RevertImportFile(ushort FileId)
+        public void RevertImportFile(ushort fileId)
         {
-            this.ImportedFiles.Remove(FileId);
+            this.importedFiles.Remove(fileId);
         }
 
-        public void SaveRom(string NewRomPath)
+        public void SaveRom(string newRomPath)
         {
-            //Console.WriteLine("Copia empezada");
+            byte[] structureAux;
 
             //Preparamos la nueva Fat para la rom
-            foreach (KeyValuePair<ushort, ImportedFile> importedFile in this.ImportedFiles)
+            foreach (KeyValuePair<ushort, ImportedFile> importedFile in this.importedFiles)
             {
-                this.ModifiedRomFat.ResizeFile(importedFile.Key, importedFile.Value.Size);
+                this.modifiedRomFat.ResizeFile(importedFile.Key, importedFile.Value.Size);
             }
 
-            BinaryWriter newRom = new BinaryWriter(File.OpenWrite(NewRomPath));
-            BinaryReader rom = new BinaryReader(File.OpenRead(this.RomPath));
+            //BinaryWriter newRom = new BinaryWriter(File.OpenWrite(newRomPath));
+            BinaryReader rom = new BinaryReader(File.OpenRead(this.romPath));
+
+            FileStream newRom = new FileStream(newRomPath, FileMode.Create, FileAccess.Write);
 
             //Cabecera se escribe al final
 
             //Escribe hasta el final de la cabecera 0-0x4000 (provisional)
-            this.FileCopier.Copy(rom.BaseStream, 0x180, 0x3E80, newRom.BaseStream, 0x180);
+            this.fileCopier.Copy(rom.BaseStream, 0x180, 0x3E80, newRom, 0x180);
 
             //Empieza con el codigo
-            this.FileCopier.Copy(rom.BaseStream, this.Header.ARM9RomOffset, this.Header.ARM9CodeSize, newRom.BaseStream, this.Header.ARM9RomOffset);
-            this.FileCopier.Copy(rom.BaseStream, this.Header.ARM9OverlayOffset, this.Header.ARM9OverlaySize, newRom.BaseStream, this.Header.ARM9OverlayOffset);
-            this.FileCopier.Copy(rom.BaseStream, this.Header.ARM7RomOffset, this.Header.ARM7CodeSize, newRom.BaseStream, this.Header.ARM7RomOffset);
-            this.FileCopier.Copy(rom.BaseStream, this.Header.ARM7OverlayOffset, this.Header.ARM7OverlaySize, newRom.BaseStream, this.Header.ARM7OverlayOffset);
+            this.fileCopier.Copy(rom.BaseStream, this.header.ARM9RomOffset, this.header.ARM9CodeSize, newRom, this.header.ARM9RomOffset);
+            this.fileCopier.Copy(rom.BaseStream, this.header.ARM9OverlayOffset, this.header.ARM9OverlaySize, newRom, this.header.ARM9OverlayOffset);
+            this.fileCopier.Copy(rom.BaseStream, this.header.ARM7RomOffset, this.header.ARM7CodeSize, newRom, this.header.ARM7RomOffset);
+            this.fileCopier.Copy(rom.BaseStream, this.header.ARM7OverlayOffset, this.header.ARM7OverlaySize, newRom, this.header.ARM7OverlayOffset);
             //Acaba con el codigo
 
             //Copia la FAT
-            newRom.BaseStream.Position = this.Header.FileAllocationTableOffset;
-            newRom.Write(this.ModifiedRomFat.GetBytes());
+            structureAux = this.modifiedRomFat.GetBytes();
+            newRom.Position = this.header.FileAllocationTableOffset;
+            newRom.Write(structureAux, 0, structureAux.Length);
 
             //Copia la FNT
-            this.FileCopier.Copy(rom.BaseStream, this.Header.FileNameTableOffset, this.Header.FileNameTableSize, newRom.BaseStream, this.Header.FileNameTableOffset);
+            this.fileCopier.Copy(rom.BaseStream, this.header.FileNameTableOffset, this.header.FileNameTableSize, newRom, this.header.FileNameTableOffset);
 
             //Copia el banner
-            this.FileCopier.Copy(rom.BaseStream, this.Header.IconBannerOffset, 0x20 + 0x20 + 0x200 + 6 * 0x100, newRom.BaseStream, this.Header.IconBannerOffset);
+            this.fileCopier.Copy(rom.BaseStream, this.header.IconBannerOffset, 0x20 + 0x20 + 0x200 + 6 * 0x100, newRom, this.header.IconBannerOffset);
 
             //Copia los archivos
             ImportedFile auxImportedFile;
-            for (ushort fileId = 0; fileId < this.Fat.FilesAmount; fileId++)
+            for (ushort fileId = 0; fileId < this.fat.FilesAmount; fileId++)
             {
-                if (this.ImportedFiles.TryGetValue(fileId, out auxImportedFile))
+                if (this.importedFiles.TryGetValue(fileId, out auxImportedFile))
                 {
-                    auxImportedFile.WriteFileAt(newRom, this.ModifiedRomFat.GetStartOffsetFromFileId(fileId));
+                    auxImportedFile.WriteFileAt(newRom, this.modifiedRomFat.GetStartOffsetFromFileId(fileId));
                 }
                 else
                 {
-                    this.FileCopier.Copy(rom.BaseStream, this.Fat.GetStartOffsetFromFileId(fileId), this.Fat.GetSizeFromFileId(fileId), newRom.BaseStream, this.ModifiedRomFat.GetStartOffsetFromFileId(fileId));
+                    this.fileCopier.Copy(rom.BaseStream, this.fat.GetStartOffsetFromFileId(fileId), this.fat.GetSizeFromFileId(fileId), newRom, this.modifiedRomFat.GetStartOffsetFromFileId(fileId));
                 }
             }
 
             //Cambiamos el tamaño de la rom en la cabecera
-            this.Header.NtrRegionRomSize = (uint)newRom.BaseStream.Length;
+            this.header.NtrRegionRomSize = (uint)newRom.Length;
 
             //Copiamos cabecera
-            newRom.BaseStream.Position = 0;
-            newRom.Write(this.Header.GetBytes());
+            structureAux = this.header.GetBytes();
+            newRom.Position = 0;
+            newRom.Write(structureAux, 0, structureAux.Length);
 
             newRom.Close();
             rom.Close();

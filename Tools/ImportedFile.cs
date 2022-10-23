@@ -10,7 +10,7 @@ namespace NDSRom.Tools
     interface ImportedFile
     {
         uint Size { get; }
-        void WriteFileAt(BinaryWriter output, uint position);
+        void WriteFileAt(Stream output, uint position);
     }
 
     class ByteArrayImportedFile : ImportedFile
@@ -27,12 +27,12 @@ namespace NDSRom.Tools
         {
             this.File = file;
         }
-        public void WriteFileAt(BinaryWriter output, uint position)
+        public void WriteFileAt(Stream output, uint position)
         {
-            long auxPos = output.BaseStream.Position;
-            output.BaseStream.Position = position;
-            output.Write(this.File);
-            output.BaseStream.Position = auxPos;
+            long auxPos = output.Position;
+            output.Position = position;
+            output.Write(this.File, 0, this.File.Length);
+            output.Position = auxPos;
         }
     }
     class ExternalImportedFile : ImportedFile
@@ -51,10 +51,10 @@ namespace NDSRom.Tools
             this.FilePath = filePath;
             this.FileCopier = fileCopier;
         }
-        public void WriteFileAt(BinaryWriter output, uint position)
+        public void WriteFileAt(Stream output, uint position)
         {
             BinaryReader input = new BinaryReader(File.OpenRead(this.FilePath));
-            this.FileCopier.Copy(input.BaseStream,0,(uint)input.BaseStream.Length, output.BaseStream, position);
+            this.FileCopier.Copy(input.BaseStream,0,(uint)input.BaseStream.Length, output, position);
             input.Close();
         }
     }
