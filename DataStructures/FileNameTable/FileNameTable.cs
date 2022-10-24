@@ -45,44 +45,48 @@ namespace NDSRom.DataStructures.FileNameTable
 
         private FNTDirectory Root;
 
-        public FileNameTable(BinaryReader rom)
+        public FileNameTable(Stream rom)
         {
-            rom.BaseStream.Position = FILE_NAME_TABLE_OFFSET;
-            uint tableOffset = rom.ReadUInt32();
-            uint tableLength = rom.ReadUInt32();
+            long positionAux = rom.Position;
 
-            rom.BaseStream.Position = tableOffset;
-            uint firstFolderOffset = rom.ReadUInt32(); //Fin de las mainTable || Inicio de las subTable
+            BinaryReader romReader = new BinaryReader(rom);
+
+            rom.Position = FILE_NAME_TABLE_OFFSET;
+            uint tableOffset = romReader.ReadUInt32();
+            uint tableLength = romReader.ReadUInt32();
+
+            rom.Position = tableOffset;
+            uint firstFolderOffset = romReader.ReadUInt32(); //Fin de las mainTable || Inicio de las subTable
 
             uint mainTableAmount = firstFolderOffset >> 3;
 
             MainTable[] mainTables = new MainTable[mainTableAmount];
 
-            rom.BaseStream.Position = tableOffset; //Nos situamos en la primera MainTable
+            rom.Position = tableOffset; //Nos situamos en la primera MainTable
             for (uint i = 0; i < mainTableAmount; i++)
             {
-                MainTable currentMain = new MainTable(rom.ReadUInt32(), rom.ReadUInt16(), rom.ReadUInt16());
-                uint nextTable = (uint)rom.BaseStream.Position; //Guardamos donde tenemos que volver antes de la siguiente iteracion
+                MainTable currentMain = new MainTable(romReader.ReadUInt32(), romReader.ReadUInt16(), romReader.ReadUInt16());
+                uint nextTable = (uint)rom.Position; //Guardamos donde tenemos que volver antes de la siguiente iteracion
 
                 ushort firstFileId = currentMain.FirstFileId;
 
-                rom.BaseStream.Position = tableOffset + currentMain.Offset;
-                for (byte nameLength = rom.ReadByte(); nameLength != 0; nameLength = rom.ReadByte())
+                rom.Position = tableOffset + currentMain.Offset;
+                for (byte nameLength = romReader.ReadByte(); nameLength != 0; nameLength = romReader.ReadByte())
                 {
                     if (nameLength < 0x80)
                     { //Fichero
-                        string fileName = new string(Encoding.GetEncoding("shift_jis").GetChars(rom.ReadBytes(nameLength)));
+                        string fileName = new string(Encoding.GetEncoding("shift_jis").GetChars(romReader.ReadBytes(nameLength)));
                         currentMain.AddSubFile(firstFileId++, fileName);
                     }
                     else
                     { //Carpeta
                         nameLength -= 0x80;
-                        string directoryName = new string(Encoding.GetEncoding("shift_jis").GetChars(rom.ReadBytes(nameLength)));
-                        currentMain.AddSubDirectory(rom.ReadUInt16(), directoryName);
+                        string directoryName = new string(Encoding.GetEncoding("shift_jis").GetChars(romReader.ReadBytes(nameLength)));
+                        currentMain.AddSubDirectory(romReader.ReadUInt16(), directoryName);
                     }
                 }
                 mainTables[i] = currentMain;
-                rom.BaseStream.Position = nextTable;
+                rom.Position = nextTable;
             }
 
             this.Root = new FNTDirectory(ROOT_DIRECTORY_ID);
@@ -101,6 +105,8 @@ namespace NDSRom.DataStructures.FileNameTable
                     dirs[i].AddChild(subFile.Item2, new FNTFile(subFile.Item1));
                 }
             }
+
+            rom.Position = positionAux;
         }
 
         public ushort GetFileId(string path)

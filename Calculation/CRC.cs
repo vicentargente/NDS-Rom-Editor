@@ -41,25 +41,25 @@ namespace NDSRom.Calculation
 			0x8201, 0x42C0, 0x4380, 0x8341, 0x4100, 0x81C1, 0x8081, 0x4040
 		};
 
-		public static ushort Calculate(byte[] Data, ushort InitialValue = 0xFFFF) {
-			ushort crc = InitialValue;
+		public static ushort Calculate(byte[] data, ushort initialValue = 0xFFFF) {
+			ushort crc = initialValue;
 
-			for (uint i = 0; i < Data.Length; i++)
+			for (uint i = 0; i < data.Length; i++)
 			{
-				crc = (ushort)((crc >> 8) ^ crc16tab[(crc ^ Data[i]) & 0xFF]);
+				crc = (ushort)((crc >> 8) ^ crc16tab[(crc ^ data[i]) & 0xFF]);
 			}
 
 			return crc;
 		}
 
-		public static ushort Calculate(byte[] Data, uint Begining, uint Length, ushort InitialValue = 0xFFFF) {
-			ushort crc = InitialValue;
+		public static ushort Calculate(byte[] data, uint begining, uint length, ushort initialValue = 0xFFFF) {
+			ushort crc = initialValue;
 
-			Length = Math.Min(Length, (uint)Data.Length);
+			length = Math.Min(length, (uint)data.Length);
 
-			for (uint i = Begining; i < Length; i++)
+			for (uint i = begining; i < length; i++)
 			{
-				crc = (ushort)((crc >> 8) ^ crc16tab[(crc ^ Data[i]) & 0xFF]);
+				crc = (ushort)((crc >> 8) ^ crc16tab[(crc ^ data[i]) & 0xFF]);
 			}
 
 			return crc;
